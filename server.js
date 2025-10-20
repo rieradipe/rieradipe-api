@@ -2,8 +2,8 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import db, { initDB } from "./db.js";
-import { z } from "zod"; // <- no existe 'email' exportado desde zod
-
+import { z } from "zod";
+import { sendContactMail } from "./emailService.js";
 const app = express();
 const PORT = process.env.PORT || 7070;
 
@@ -28,9 +28,9 @@ const ContactPayload = z.object({
 });
 
 // POST /api/contact -> crea/encuentra contacto, thread y 1ª nota
-app.post("/api/contact", (req, res) => {
+app.post("/api/contact", async (req, res) => {
   try {
-    const data = ContactPayload.parse(req.body); // <- estaba mal escrito ContactPauload
+    const data = ContactPayload.parse(req.body);
 
     // 1) contacto (crea si no existe por email)
     const existing = db
@@ -63,16 +63,33 @@ app.post("/api/contact", (req, res) => {
     // 3) primera nota (mensaje inbound)
     db.prepare(
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
-    ).run(threadId, data.mensaje, "inbound", "web"); // <- aquí había ';' en lugar de ','
+    ).run(threadId, data.mensaje, "inbound", "web");
+
+    //envio de correo
+    try {
+      await sendContactMail({
+        nombre: data.nombre,
+        email: data.email,
+        asunto: title,
+        mensaje: data.mensaje,
+        contactId,
+        threadId,
+      });
+    } catch (mailErr) {
+      console.warn(
+        "⚠️ No se pudo enviar el correo, pero el contacto se guardó:",
+        mailErr.message
+      );
+    }
 
     return res.json({ ok: true, contactId, threadId });
   } catch (err) {
+    console.error("Error en /api/contact:", err);
     return res
       .status(400)
       .json({ ok: false, error: err.message || "bad_request" });
   }
 });
-
 // Salud
 app.get("/health", (_req, res) => {
   const row = db.prepare('SELECT datetime("now") as now').get();

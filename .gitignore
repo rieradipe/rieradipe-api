@@ -1,0 +1,6 @@
+# entorno
+.env
+# base de datos
+data.sqlite
+#logs
+npm-debug.log*

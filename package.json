@@ -1,0 +1,31 @@
+{
+  "name": "rieradipe-api",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node server.js",
+    "init": "node server.js --init"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rieradipe/rieradipe-api.git"
+  },
+  "keywords": [],
+  "author": "(Alba Riera) Rieradipe",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rieradipe/rieradipe-api/issues"
+  },
+  "homepage": "https://github.com/rieradipe/rieradipe-api#readme",
+  "description": "",
+  "dependencies": {
+    "better-sqlite3": "^12.4.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "nodemailer": "^7.0.9",
+    "zod": "^4.1.12"
+  }
+}

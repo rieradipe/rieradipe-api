@@ -8,6 +8,8 @@ export function getTransporter() {
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
+      logger: true,
+      debug: true,
     },
   });
   return transporter;
@@ -21,7 +23,7 @@ export async function sendContactMail({
   threadId,
 }) {
   const transporter = getTransporter();
-  const subject = '📬 ${asunto || "Nuevo contacto desde la web"}';
+  const subject = `📬 ${asunto || "Nuevo contacto desde la web"}`;
 
   const html = `
     <h2> Nuevo contacto desde la web </h2>
@@ -33,19 +35,35 @@ export async function sendContactMail({
     <hr/>
     <p>Contact #${contactId} - ThreadId #${threadId}</p>`;
 
-  try {
-    const info = await transporter.sendMail({
-      from: process.env.MAIL_FROM,
-      to: process.env.MAIL_TO,
-      subject,
-      replyTo: email,
-      html,
-    });
-    console.log(`📨 Correo enviado correctamente: ${info.messageId}`);
+  const info = await transporter.sendMail({
+    from: process.env.MAIL_FROM,
+    to: process.env.MAIL_TO,
+    subject,
+    replyTo: email,
+    html,
+  });
+  console.log(`📨 Correo enviado correctamente: ${info.messageId}`);
+  return info;
+}
 
-    return info;
-  } catch (error) {
-    console.log("❌ Error al enviar el correo: ", error);
-    throw new Error("No se ha podido enviar el correo");
-  }
+export async function sendAutoReply({ nombre, email }) {
+  const transporter = getTransporter();
+
+  const subject = "📬 Gracias por contactar con RieraDipe";
+  const text = `Hola ${nombre || amigo / a}`;
+  const html = `
+    <h2>¡Hola ${nombre || "amigo/a"}!.</h2>
+    <p> Bienvenido al mundo RieraDipe<br/></p>
+    <p>Hemos recibido tu mensaje correctamente y te responderemos en breve</p>
+    <p>Un saludo, <br/> <b>El equipo de RieraDiPe</b></p>
+    <hr/>
+    <small>Este es un correo automático, por favor no respondas a este correo.</small>`;
+  const info = await transporter.sendMail({
+    from: process.env.MAIL_FROM,
+    to: email,
+    subject,
+    text,
+    html,
+  });
+  console.log(`📤 Auto-reply enviado: ${info.messageId}`);
 }

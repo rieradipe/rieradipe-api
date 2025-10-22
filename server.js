@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import db, { initDB } from "./db.js";
 import { z } from "zod";
-import { sendContactMail } from "./emailService.js";
+import { sendAutoReply, sendContactMail } from "./emailService.js";
 const app = express();
 const PORT = process.env.PORT || 7070;
 
@@ -31,8 +31,9 @@ const ContactPayload = z.object({
 app.post("/api/contact", async (req, res) => {
   try {
     const data = ContactPayload.parse(req.body);
+    const source = (data.source || "web").toLowerCase();
 
-    // 1) contacto (crea si no existe por email)
+    // 1) contacto
     const existing = db
       .prepare("SELECT id FROM contacts WHERE email = ?")
       .get(data.email);
@@ -42,16 +43,11 @@ app.post("/api/contact", async (req, res) => {
         .prepare(
           "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
         )
-        .run(
-          data.nombre || null,
-          data.email,
-          data.phone || null,
-          data.source || "web"
-        );
+        .run(data.nombre || null, data.email, data.phone || null, source);
       contactId = ins.lastInsertRowid;
     }
 
-    // 2) thread (nuevo por envío)
+    // 2) thread
     const title = data.asunto || "Contacto desde la web";
     const t = db
       .prepare(
@@ -60,14 +56,14 @@ app.post("/api/contact", async (req, res) => {
       .run(contactId, title, "open");
     const threadId = t.lastInsertRowid;
 
-    // 3) primera nota (mensaje inbound)
+    // 3) nota
     db.prepare(
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
     ).run(threadId, data.mensaje, "inbound", "web");
 
-    //envio de correo
+    // 4) correos (con logs claros y capturas separadas)
     try {
-      await sendContactMail({
+      const infoAdmin = await sendContactMail({
         nombre: data.nombre,
         email: data.email,
         asunto: title,
@@ -75,11 +71,23 @@ app.post("/api/contact", async (req, res) => {
         contactId,
         threadId,
       });
-    } catch (mailErr) {
-      console.warn(
-        "⚠️ No se pudo enviar el correo, pero el contacto se guardó:",
-        mailErr.message
+      console.log(
+        `📨 Admin mail enviado a ${process.env.MAIL_TO}: ${infoAdmin?.messageId}`
       );
+    } catch (err) {
+      console.error("❌ Falló envío al admin:", err?.message || err);
+    }
+
+    try {
+      const infoUser = await sendAutoReply({
+        nombre: data.nombre,
+        email: data.email,
+      });
+      console.log(
+        `📤 Auto-reply enviado a ${data.email}: ${infoUser?.messageId}`
+      );
+    } catch (err) {
+      console.error("❌ Falló auto-reply:", err?.message || err);
     }
 
     return res.json({ ok: true, contactId, threadId });
@@ -90,6 +98,23 @@ app.post("/api/contact", async (req, res) => {
       .json({ ok: false, error: err.message || "bad_request" });
   }
 });
+
+// (opcional) para que el navegador no muestre "No se puede obtener /"
+app.get("/", (_req, res) => res.send("API RieraDiPe OK"));
+
+// Ruta de prueba para auto-reply aislado
+app.get("/debug/send-auto-reply", async (req, res) => {
+  const to = req.query.to;
+  if (!to)
+    return res.status(400).json({ ok: false, error: "Falta ?to=correo" });
+  try {
+    const info = await sendAutoReply({ nombre: "Test", email: to });
+    return res.json({ ok: true, messageId: info?.messageId || null });
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: e.message });
+  }
+});
+
 // Salud
 app.get("/health", (_req, res) => {
   const row = db.prepare('SELECT datetime("now") as now').get();

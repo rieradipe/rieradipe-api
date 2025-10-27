@@ -2,9 +2,13 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import db, { initDB } from "./db.js";
+import db, { initDB } from "../db.js";
 import { z } from "zod";
-import { sendContactMail, sendAutoReply } from "./emailService.js";
+import { sendContactMail, sendAutoReply } from "../emailService.js";
+
+// 👇 NUEVO: logger + middleware http
+import logger from "./logger/index.js";
+import httpLogger from "./middleware/httpLogger.js";
 
 const app = express();
 const PORT = process.env.PORT || 7070;
@@ -12,11 +16,12 @@ const PORT = process.env.PORT || 7070;
 // Middlewares
 app.use(cors({ origin: true }));
 app.use(express.json());
+app.use(httpLogger);
 
 // Soporte para inicializar la DB con:  npm run init  (-> node server.js --init)
 if (process.argv.includes("--init")) {
   initDB();
-  console.log("DB inicializada ✅");
+  logger.info("DB inicializada ✅");
   process.exit(0);
 }
 
@@ -78,11 +83,11 @@ app.post("/api/contact", async (req, res) => {
         contactId,
         threadId,
       });
-      console.log(
+      logger.info(
         `📨 Admin mail enviado a ${process.env.MAIL_TO}: ${infoAdmin?.messageId}`
       );
     } catch (mailErr) {
-      console.warn(
+      logger.warn(
         "⚠️ Falló envío al admin (contacto guardado):",
         mailErr?.message || mailErr
       );
@@ -93,11 +98,11 @@ app.post("/api/contact", async (req, res) => {
         nombre: data.nombre,
         email: data.email,
       });
-      console.log(
+      logger.info(
         `📤 Auto-reply enviado a ${data.email}: ${infoUser?.messageId}`
       );
     } catch (mailErr) {
-      console.warn(
+      logger.warn(
         "⚠️ Falló auto-reply (contacto guardado):",
         mailErr?.message || mailErr
       );
@@ -109,7 +114,7 @@ app.post("/api/contact", async (req, res) => {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ ok: false, error: err.format() });
     }
-    console.error("❌ Error en /api/contact:", err?.message || err);
+    logger.error("❌ Error en /api/contact:", err?.message || err);
     return res
       .status(400)
       .json({ ok: false, error: err?.message || "bad_request" });
@@ -121,7 +126,24 @@ app.get("/health", (_req, res) => {
   const row = db.prepare('SELECT datetime("now") as now').get();
   res.json({ ok: true, now: row.now });
 });
+//404 explicito
+app.use((req, res) => {
+  req.log?.warn?.({ url: req.originalUrl }, "route_not_found");
+  res.status(404).json({ error: "Not found" });
+});
+//manejador global
+app.use((err, req, res, next) => {
+  (req.log || logger).error({ err }, "unhandled_error");
+  res.status(500).json({ error: "Internal Server Error" });
+});
+//global de excepciones
+process.on("uncaughtException", (err) => {
+  logger.fatal({ err }, "uncaught_exception");
+});
+process.on("unhandledRejection", (reason) => {
+  logger.fatal({ reason }, "unhandled_rejection");
+});
 
 app.listen(PORT, () => {
-  console.log(`API en http://localhost:${PORT}`);
+  logger.info(`API en http://localhost:${PORT}`);
 });

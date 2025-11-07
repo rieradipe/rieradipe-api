@@ -29,6 +29,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "mongose": "^0.0.2-security",
     "nodemailer": "^7.0.9",
     "pino": "^10.1.0",
     "pino-http": "^11.0.0",

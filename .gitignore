@@ -4,3 +4,6 @@
 data.sqlite
 #logs
 npm-debug.log*
+#dependencias
+node_modules/
+

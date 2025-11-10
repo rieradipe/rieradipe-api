@@ -1,12 +1,16 @@
 import express from "express";
 import httpLogger from "./middleware/httpLogger.js";
 import logger from "logger/Index.js";
+import contactRoutes from "./src/routes/ContactRoutes.js";
 
 const app = express();
 
 //midelwarebase
 app.use(express.json());
 app.use(httpLogger);
+
+//rutas
+app.use("/api/contacts", contactRoutes);
 
 //solo probar que el log funciona
 app.get("/health", (req, res) => {

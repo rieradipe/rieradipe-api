@@ -8,6 +8,7 @@ import logger from "./logger/index.js";
 import httpLogger from "./middleware/httpLogger.js";
 import contactRoutes from "./routes/ContactRoutes.js";
 import messageRoutes from "./routes/MessageRoutes.js";
+import notesRoutes from "./routes/NotesRoutes.js";
 
 const app = express();
 
@@ -16,7 +17,8 @@ app.use(cors({ origin: true }));
 app.use(express.json());
 app.use(httpLogger);
 app.use("/api/contact", contactRoutes);
-app.use("/api", messageRoutes);
+app.use("/api/message", messageRoutes);
+app.use("/api/notes", notesRoutes);
 
 // Validación del payload del formulario
 const ContactPayload = z.object({

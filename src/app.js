@@ -15,7 +15,7 @@ const app = express();
 app.use(cors({ origin: true }));
 app.use(express.json());
 app.use(httpLogger);
-app.use("/api", contactRoutes);
+app.use("/api/contact", contactRoutes);
 app.use("/api", messageRoutes);
 
 // Validación del payload del formulario
@@ -105,7 +105,8 @@ app.get("/api/contacts", (req, res) => {
   try {
     const contacts = db
       .prepare(
-        `SELECT c.id, c.name, c.email, c.phone, c.source, c.created_at,
+        `
+        SELECT c.id, c.name, c.email, c.phone, c.source, c.created_at,
                 COUNT(t.id) as threads_count
          FROM contacts c
          LEFT JOIN threads t ON t.contact_id = c.id
@@ -116,7 +117,6 @@ app.get("/api/contacts", (req, res) => {
 
     res.json({ ok: true, data: contacts });
   } catch (err) {
-    req.log?.error?.({ err }, "error_fetching_contacts");
     res.status(500).json({ ok: false, error: "Error al obtener contactos" });
   }
 });

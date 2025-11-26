@@ -1,51 +1,65 @@
 import db from "../../db.js";
-// crear nuevo contacto + thread + nota
-export const createContact = (req, res) => {
-  const { nombre, email, mensaje, phone, source } = req.body;
 
-  if (!email || !mensaje) {
-    return res.status(400).json({ error: "Email y mensaje son obligatorios" });
+// Crear contacto + hilo + nota
+export const createContactWithThreadAndNote = (req, res) => {
+  const { name, email, phone, source, subject, message } = req.body;
+
+  // Los obligatorios REALMENTE son estos
+  if (!email || !subject || !message) {
+    return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
   try {
     // 1️⃣ Buscar contacto existente
-    let contact = db
+    let existing = db
       .prepare("SELECT id FROM contacts WHERE email = ? LIMIT 1")
       .get(email);
 
-    let contactId = contact?.id;
+    let contactId;
 
-    // 2️⃣ Crear contacto si no existe
-    if (!contactId) {
-      const ins = db
-        .prepare(
-          "INSERT INTO contacts(name, email, phone, source, created_at) VALUES (?, ?, ?, ?, datetime('now'))"
-        )
-        .run(nombre ?? null, email, phone ?? null, source ?? "web");
-      contactId = ins.lastInsertRowid;
+    if (!existing) {
+      // 2️⃣ Crear contacto si no existe
+      const stmtContact = db.prepare(
+        "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
+      );
+      const info = stmtContact.run(
+        name ?? null,
+        email,
+        phone ?? null,
+        source ?? "web"
+      );
+      contactId = info.lastInsertRowid;
+    } else {
+      contactId = existing.id;
     }
 
-    // 3️⃣ Crear thread
-    const t = db
-      .prepare(
-        "INSERT INTO threads(contact_id, title, status) VALUES (?, ?, ?)"
-      )
-      .run(contactId, "Contacto desde la web", "open");
-    const threadId = t.lastInsertRowid;
+    // 3️⃣ Crear hilo asociado
+    const threadTitle = subject || "Contacto desde la web";
 
-    // 4️⃣ Crear nota
-    db.prepare(
-      "INSERT INTO notes(thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
-    ).run(threadId, mensaje, "inbound", "web");
+    const stmtThread = db.prepare(
+      "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
+    );
+    const threadInfo = stmtThread.run(contactId, threadTitle, "open");
+    const threadId = threadInfo.lastInsertRowid;
 
-    res.status(201).json({ ok: true, contactId, threadId });
+    // 4️⃣ Crear nota inicial en el hilo
+    const stmtNote = db.prepare(
+      "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
+    );
+    stmtNote.run(threadId, message, "inbound", "web");
+
+    res.status(201).json({
+      success: true,
+      contactId,
+      threadId,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al guardar el contacto" });
   }
 };
 
-//obtener todos los contactos
+// Obtener todos los contactos
 export const getAllContacts = (req, res) => {
   try {
     const stmt = db.prepare("SELECT * FROM contacts ORDER BY created_at DESC");
@@ -56,7 +70,8 @@ export const getAllContacts = (req, res) => {
     res.status(500).json({ error: "Error al obtener los contactos" });
   }
 };
-//obtener por id
+
+// Obtener contacto por ID
 export const getContactById = (req, res) => {
   const { id } = req.params;
 
@@ -67,6 +82,7 @@ export const getContactById = (req, res) => {
     if (!contact) {
       return res.status(404).json({ error: "Contacto no encontrado" });
     }
+
     res.json(contact);
   } catch (err) {
     console.error(err);
@@ -74,37 +90,45 @@ export const getContactById = (req, res) => {
   }
 };
 
-//modificar un contacto
+// Actualizar contacto
 export const updateContact = (req, res) => {
   const { id } = req.params;
-  const { name, email, message } = req.body;
-  if (!name && !email && !message) {
+  const { name, email, phone, source } = req.body;
+
+  if (!name && !email && !phone && !source) {
     return res
       .status(400)
       .json({ error: "Al menos un campo debe ser actualizado" });
   }
+
   try {
     const contact = db.prepare("SELECT * FROM contacts WHERE id = ?").get(id);
     if (!contact) {
       return res.status(404).json({ error: "Contacto no encontrado" });
     }
+
     const stmt = db.prepare(`
-                UPDATE contacts 
-                SET name = ?, email = ?, message =? WHERE id = ?
-                `);
+      UPDATE contacts 
+      SET name = ?, email = ?, phone = ?, source = ?
+      WHERE id = ?
+    `);
+
     stmt.run(
       name || contact.name,
       email || contact.email,
-      message || contact.message,
+      phone || contact.phone,
+      source || contact.source,
       id
     );
+
     res.json({ message: "Contacto actualizado" });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Error al actualizar el contacto" });
   }
 };
-//eliminar contacto
+
+// Eliminar contacto
 export const deleteContact = (req, res) => {
   const { id } = req.params;
 

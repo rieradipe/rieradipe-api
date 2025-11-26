@@ -1,12 +1,12 @@
 import express from "express";
-import {
-  getNotesByThread,
-  createNote,
-} from "../controllers/NotesController.js";
+import { NotesController } from "../controllers/NotesController.js";
 
 const router = express.Router();
 
 //threads
-router.get("/:thread_id", getNotesByThread);
-router.post("/:thread_id", createNote);
+router.get("/", NotesController.getAllNotes);
+router.get("/thread/:threadId", NotesController.getNotesByThread);
+router.post("/", NotesController.createNote);
+router.delete("/:Id", NotesController.deleteNote);
+router.get("/thread/:threadId", NotesController.getNotesByThread);
 export default router;

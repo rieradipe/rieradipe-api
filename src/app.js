@@ -7,51 +7,58 @@ import { sendContactMail, sendAutoReply } from "../emailService.js";
 import logger from "./logger/index.js";
 import httpLogger from "./middleware/httpLogger.js";
 import contactRoutes from "./routes/ContactRoutes.js";
-import messageRoutes from "./routes/MessageRoutes.js";
+import messagesRoutes from "./routes/MessagesRoutes.js";
 import notesRoutes from "./routes/NotesRoutes.js";
 
 const app = express();
 
 // Middlewares base
-app.use(cors({ origin: true }));
 app.use(express.json());
-app.use(httpLogger);
-app.use("/api/contact", contactRoutes);
-app.use("/api/message", messageRoutes);
+app.use(cors({ origin: true }));
 app.use("/api/notes", notesRoutes);
+app.use(httpLogger);
+app.use("/api/contacts", contactRoutes);
+app.use("/api/messages", messagesRoutes);
 
 // Validación del payload del formulario
 const ContactPayload = z.object({
-  nombre: z.string().trim().optional(),
+  name: z.string().trim(),
   email: z.string().email(),
-  asunto: z.string().trim().optional(),
-  mensaje: z.string().min(5, "El mensaje debe tener al menos 5 caracteres"),
+  subject: z.string().trim().optional(),
+  message: z.string().min(5, "El mensaje debe tener al menos 5 caracteres"),
   phone: z.string().trim().optional(),
   source: z.string().trim().optional(),
 });
 
-// 📩 POST /api/contact -> crea contacto, hilo, nota y envía correos
-app.post("/api/contact", async (req, res) => {
+// 📩 POST /api/contacts -> crea contacto, hilo, nota y envía correos
+app.post("/api/contacts", async (req, res) => {
   try {
     const data = ContactPayload.parse(req.body);
     const source = (data.source || "web").toLowerCase();
 
+    // Buscar contacto existente por email
     const existing = db
       .prepare("SELECT id FROM contacts WHERE email = ? LIMIT 1")
       .get(data.email);
 
     let contactId = existing?.id;
+
+    // Crear contacto si no existe
     if (!contactId) {
       const ins = db
         .prepare(
           "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
         )
-        .run(data.nombre ?? null, data.email, data.phone ?? null, source);
+        .run(data.name ?? null, data.email, data.phone ?? null, source);
+
       contactId = ins.lastInsertRowid;
     }
 
+    // Título del hilo
     const title =
-      (data.asunto && data.asunto.trim()) || "Contacto desde la web";
+      (data.subject && data.subject.trim()) || "Contacto desde la web";
+
+    // Crear HILO
     const t = db
       .prepare(
         "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
@@ -59,19 +66,22 @@ app.post("/api/contact", async (req, res) => {
       .run(contactId, title, "open");
     const threadId = t.lastInsertRowid;
 
+    // Crear NOTA inicial con el mensaje
     db.prepare(
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
-    ).run(threadId, data.mensaje, "inbound", "web");
+    ).run(threadId, data.message, "inbound", "web");
 
+    // Email admin
     try {
       const infoAdmin = await sendContactMail({
-        nombre: data.nombre,
+        nombre: data.name,
         email: data.email,
         asunto: title,
-        mensaje: data.mensaje,
+        mensaje: data.message,
         contactId,
         threadId,
       });
+
       logger.info(
         `📨 Admin mail enviado a ${process.env.MAIL_TO}: ${infoAdmin?.messageId}`
       );
@@ -79,11 +89,13 @@ app.post("/api/contact", async (req, res) => {
       logger.warn("⚠️ Falló envío al admin:", mailErr?.message || mailErr);
     }
 
+    // Auto-reply al usuario
     try {
       const infoUser = await sendAutoReply({
-        nombre: data.nombre,
+        nombre: data.name,
         email: data.email,
       });
+
       logger.info(
         `📤 Auto-reply enviado a ${data.email}: ${infoUser?.messageId}`
       );
@@ -96,12 +108,14 @@ app.post("/api/contact", async (req, res) => {
     if (err instanceof z.ZodError) {
       return res.status(400).json({ ok: false, error: err.format() });
     }
+
     logger.error("❌ Error en /api/contact:", err?.message || err);
     return res
       .status(400)
       .json({ ok: false, error: err?.message || "bad_request" });
   }
 });
+
 // 🧾 GET /api/contacts -> lista todos los contactos con sus threads
 app.get("/api/contacts", (req, res) => {
   try {

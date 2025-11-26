@@ -1,45 +1,61 @@
 import db from "../../db.js";
 
-//obtener todas las notas de un hilo especifico
-export const getNotesByThread = (req, res) => {
-  const { thread_id } = req.params;
-  try {
-    const notes = db
-      .prepare(
-        `
-            SELECT * FROM notes WHERE thread_id = ?
-            ORDER BY created_at DESC 
-            `
-      )
-      .all(thread_id);
-    res.json(notes);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-};
+export const NotesController = {
+  //crear nota en un hilo
+  createNote: (req, res) => {
+    const threadId = req.params.threadId;
+    const { body } = req.body;
 
-//crear nueva nota en un hilo
-export const createNote = (req, res) => {
-  const { thread_id } = req.params;
-  const { body, direction, medium } = req.body;
+    if (!threadId || !body) {
+      return res.status(400).json({ error: "Faltan datos" });
+    }
+    try {
+      const stmt = db.prepare(
+        "INSERT INTO notes (threadId, body) VALUES (?, ?)"
+      );
+      const info = stmt.run(threadId, body);
+      res.json({ success: true, notedId: info.lastInsertRowid });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+  //obtener todas las notas de un hilo
+  getAllNotes: (req, res) => {
+    try {
+      const notes = db.prepare("SELECT * FROM notes").all(); // ejemplo con better-sqlite3
+      res.json(notes);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+  //obtener las notas por un thread
+  getNotesByThread: (req, res) => {
+    const threadId = req.params.threadId;
 
-  if (!body)
-    return res.status(400).json({ error: "El cuerpo(body) es obligatorio" });
+    if (!threadId) {
+      return res.status(400).json({ error: "Falta el ID del hilo" });
+    }
+    try {
+      const stmt = db.prepare("SELECT * FROM notes WHERE thread_id = ?");
+      const notes = stmt.all(threadId);
+      res.json(notes);
+    } catch (err) {
+      res.ststus(500).json({ error: err.message });
+    }
+  },
+  //elimar notas
+  deleteNote: (req, res) => {
+    const noteId = req.params.noteId;
 
-  try {
-    const stmt = db.prepare(`
-            INSERT INTO notes ( thread_id, body, direction, medium)
-            VALUES (?, ?, ?, ?)
-            `);
-    const info = stmt.run(thread_id, body, direction || null, medium || null);
-    res.status(201).json({
-      id: info.lastInsertRowid,
-      thread_id,
-      body,
-      direction,
-      medium,
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+    if (!noteId) {
+      return res.stutus(400).json({ error: "Falta el Id de la nota" });
+    }
+    try {
+      const stmt = db.prepare("DELETE FROM notes WHERE id = ?");
+      stmt.run(noteId);
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
 };

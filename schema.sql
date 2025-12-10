@@ -36,3 +36,17 @@ CREATE TABLE IF NOT EXISTS reminders (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (thread_id) REFERENCES threads(id) ON DELETE CASCADE
 );
+CREATE TABLE IF NOT EXISTS emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    contact_id INTEGER NOT NULL,
+    thread_id INTEGER NOT NULL,
+    direction TEXT,      -- "inbound" o "outbound"
+    medium TEXT,         -- "web", "email", etc.
+    subject TEXT,
+    body TEXT,
+    status TEXT DEFAULT 'sent', -- "sent" o "failed"
+    error TEXT,          -- si hubo fallo
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(contact_id) REFERENCES contacts(id) ON DELETE CASCADE,
+    FOREIGN KEY(thread_id) REFERENCES threads(id) ON DELETE CASCADE
+);

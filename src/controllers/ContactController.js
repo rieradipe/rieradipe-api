@@ -1,10 +1,10 @@
 import db from "../../db.js";
+import { sendContactMail, sendAutoReply } from "../service/emailService.js";
 
-// Crear contacto + hilo + nota
-export const createContactWithThreadAndNote = (req, res) => {
+// Crear contacto + hilo + nota y enviar correos
+export const createContactWithThreadAndNote = async (req, res) => {
   const { name, email, phone, source, subject, message } = req.body;
 
-  // Los obligatorios REALMENTE son estos
   if (!email || !subject || !message) {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
@@ -19,15 +19,11 @@ export const createContactWithThreadAndNote = (req, res) => {
 
     if (!existing) {
       // 2️⃣ Crear contacto si no existe
-      const stmtContact = db.prepare(
-        "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
-      );
-      const info = stmtContact.run(
-        name ?? null,
-        email,
-        phone ?? null,
-        source ?? "web"
-      );
+      const info = db
+        .prepare(
+          "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
+        )
+        .run(name ?? null, email, phone ?? null, source ?? "web");
       contactId = info.lastInsertRowid;
     } else {
       contactId = existing.id;
@@ -35,29 +31,114 @@ export const createContactWithThreadAndNote = (req, res) => {
 
     // 3️⃣ Crear hilo asociado
     const threadTitle = subject || "Contacto desde la web";
-
-    const stmtThread = db.prepare(
-      "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
-    );
-    const threadInfo = stmtThread.run(contactId, threadTitle, "open");
+    const threadInfo = db
+      .prepare(
+        "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
+      )
+      .run(contactId, threadTitle, "open");
     const threadId = threadInfo.lastInsertRowid;
 
-    // 4️⃣ Crear nota inicial en el hilo
-    const stmtNote = db.prepare(
+    // 4️⃣ Crear nota inicial
+    db.prepare(
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
-    );
-    stmtNote.run(threadId, message, "inbound", "web");
+    ).run(threadId, message, "inbound", "web");
 
-    res.status(201).json({
-      success: true,
-      contactId,
-      threadId,
-    });
+    // 5️⃣ Enviar correo al admin
+    try {
+      const infoAdmin = await sendContactMail({
+        nombre: name,
+        email,
+        asunto: threadTitle,
+        mensaje: message,
+        contactId,
+        threadId,
+      });
+
+      db.prepare(
+        `
+        INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        contactId,
+        threadId,
+        "outbound",
+        "email",
+        threadTitle,
+        message,
+        "sent"
+      );
+
+      console.log(`📨 Admin mail enviado: ${infoAdmin.messageId}`);
+    } catch (err) {
+      db.prepare(
+        `
+        INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status, error)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        contactId,
+        threadId,
+        "outbound",
+        "email",
+        threadTitle,
+        message,
+        "failed",
+        err.message
+      );
+
+      console.error("❌ Falló envío de correo al admin:", err);
+    }
+
+    // 6️⃣ Enviar auto-reply al usuario
+    try {
+      const infoUser = await sendAutoReply({ nombre: name, email });
+
+      db.prepare(
+        `
+        INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        contactId,
+        threadId,
+        "outbound",
+        "email",
+        "Respuesta automática",
+        message,
+        "sent"
+      );
+
+      console.log(`📤 Auto-reply enviado: ${infoUser.messageId}`);
+    } catch (err) {
+      db.prepare(
+        `
+        INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status, error)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `
+      ).run(
+        contactId,
+        threadId,
+        "outbound",
+        "email",
+        "Respuesta automática",
+        message,
+        "failed",
+        err.message
+      );
+
+      console.error("❌ Falló auto-reply:", err);
+    }
+
+    // 7️⃣ Responder al cliente solo después de todo
+    return res.status(201).json({ success: true, contactId, threadId });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Error al guardar el contacto" });
+    console.error("❌ Error en createContactWithThreadAndNote:", err);
+    return res.status(500).json({ error: "Error al guardar el contacto" });
   }
 };
+
+// Resto de endpoints (getAllContacts, getContactById, updateContact, deleteContact) se mantienen igual
 
 // Obtener todos los contactos
 export const getAllContacts = (req, res) => {

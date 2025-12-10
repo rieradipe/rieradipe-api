@@ -22,7 +22,7 @@ export const NotesController = {
   //obtener todas las notas de un hilo
   getAllNotes: (req, res) => {
     try {
-      const notes = db.prepare("SELECT * FROM notes").all(); // ejemplo con better-sqlite3
+      const notes = db.prepare("SELECT * FROM notes").all();
       res.json(notes);
     } catch (err) {
       res.status(500).json({ error: err.message });

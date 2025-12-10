@@ -6,4 +6,10 @@ data.sqlite
 npm-debug.log*
 #dependencias
 node_modules/
+# builds temporales
+dist/
+build/
 
+# sistema
+.DS_Store
+Thumbs.db

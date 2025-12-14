@@ -1,5 +1,3 @@
-import db from "./db.js";
-
 const contacts = [
   {
     name: "Jordi",

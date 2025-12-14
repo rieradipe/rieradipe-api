@@ -5,12 +5,16 @@ import { sendContactMail, sendAutoReply } from "../service/emailService.js";
 export const createContactWithThreadAndNote = async (req, res) => {
   const { name, email, phone, source, subject, message } = req.body;
 
+  console.log("📥 createContactWithThreadAndNote recibido:", req.body);
+
   if (!email || !subject || !message) {
+    console.warn("⚠️ Faltan datos obligatorios");
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
   try {
     // 1️⃣ Buscar contacto existente
+    console.log("🔎 Buscando contacto existente por email:", email);
     let existing = db
       .prepare("SELECT id FROM contacts WHERE email = ? LIMIT 1")
       .get(email);
@@ -18,7 +22,7 @@ export const createContactWithThreadAndNote = async (req, res) => {
     let contactId;
 
     if (!existing) {
-      // 2️⃣ Crear contacto si no existe
+      console.log("➕ Creando nuevo contacto:", { name, email, phone, source });
       const info = db
         .prepare(
           "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
@@ -27,10 +31,12 @@ export const createContactWithThreadAndNote = async (req, res) => {
       contactId = info.lastInsertRowid;
     } else {
       contactId = existing.id;
+      console.log("✅ Contacto existente encontrado, id:", contactId);
     }
 
-    // 3️⃣ Crear hilo asociado
+    // 2️⃣ Crear hilo asociado
     const threadTitle = subject || "Contacto desde la web";
+    console.log("🧵 Creando hilo:", threadTitle);
     const threadInfo = db
       .prepare(
         "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
@@ -38,12 +44,13 @@ export const createContactWithThreadAndNote = async (req, res) => {
       .run(contactId, threadTitle, "open");
     const threadId = threadInfo.lastInsertRowid;
 
-    // 4️⃣ Crear nota inicial
+    // 3️⃣ Crear nota inicial
+    console.log("📝 Creando nota inicial");
     db.prepare(
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
     ).run(threadId, message, "inbound", "web");
 
-    // 5️⃣ Enviar correo al admin
+    // 4️⃣ Enviar correo al admin
     try {
       const infoAdmin = await sendContactMail({
         nombre: name,
@@ -53,6 +60,7 @@ export const createContactWithThreadAndNote = async (req, res) => {
         contactId,
         threadId,
       });
+      console.log("📨 Correo admin enviado:", infoAdmin.messageId);
 
       db.prepare(
         `
@@ -68,9 +76,8 @@ export const createContactWithThreadAndNote = async (req, res) => {
         message,
         "sent"
       );
-
-      console.log(`📨 Admin mail enviado: ${infoAdmin.messageId}`);
     } catch (err) {
+      console.error("❌ Falló envío de correo admin:", err.message);
       db.prepare(
         `
         INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status, error)
@@ -86,13 +93,12 @@ export const createContactWithThreadAndNote = async (req, res) => {
         "failed",
         err.message
       );
-
-      console.error("❌ Falló envío de correo al admin:", err);
     }
 
-    // 6️⃣ Enviar auto-reply al usuario
+    // 5️⃣ Enviar auto-reply al usuario
     try {
       const infoUser = await sendAutoReply({ nombre: name, email });
+      console.log("📤 Auto-reply enviado:", infoUser.messageId);
 
       db.prepare(
         `
@@ -108,9 +114,8 @@ export const createContactWithThreadAndNote = async (req, res) => {
         message,
         "sent"
       );
-
-      console.log(`📤 Auto-reply enviado: ${infoUser.messageId}`);
     } catch (err) {
+      console.error("❌ Falló auto-reply:", err.message);
       db.prepare(
         `
         INSERT INTO emails (contact_id, thread_id, direction, medium, subject, body, status, error)
@@ -126,11 +131,13 @@ export const createContactWithThreadAndNote = async (req, res) => {
         "failed",
         err.message
       );
-
-      console.error("❌ Falló auto-reply:", err);
     }
 
-    // 7️⃣ Responder al cliente solo después de todo
+    console.log("✅ Contacto, hilo y notas creados correctamente:", {
+      contactId,
+      threadId,
+    });
+
     return res.status(201).json({ success: true, contactId, threadId });
   } catch (err) {
     console.error("❌ Error en createContactWithThreadAndNote:", err);
@@ -138,16 +145,16 @@ export const createContactWithThreadAndNote = async (req, res) => {
   }
 };
 
-// Resto de endpoints (getAllContacts, getContactById, updateContact, deleteContact) se mantienen igual
-
 // Obtener todos los contactos
 export const getAllContacts = (req, res) => {
+  console.log("📥 getAllContacts llamado");
   try {
-    const stmt = db.prepare("SELECT * FROM contacts ORDER BY created_at DESC");
-    const rows = stmt.all();
+    const rows = db
+      .prepare("SELECT * FROM contacts ORDER BY created_at DESC")
+      .all();
     res.json(rows);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error al obtener los contactos:", err);
     res.status(500).json({ error: "Error al obtener los contactos" });
   }
 };
@@ -155,18 +162,17 @@ export const getAllContacts = (req, res) => {
 // Obtener contacto por ID
 export const getContactById = (req, res) => {
   const { id } = req.params;
+  console.log("📥 getContactById llamado:", id);
 
   try {
-    const stmt = db.prepare("SELECT * FROM contacts WHERE id = ?");
-    const contact = stmt.get(id);
-
+    const contact = db.prepare("SELECT * FROM contacts WHERE id = ?").get(id);
     if (!contact) {
+      console.warn("⚠️ Contacto no encontrado:", id);
       return res.status(404).json({ error: "Contacto no encontrado" });
     }
-
     res.json(contact);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error al obtener el contacto:", err);
     res.status(500).json({ error: "Error al obtener el contacto" });
   }
 };
@@ -175,8 +181,10 @@ export const getContactById = (req, res) => {
 export const updateContact = (req, res) => {
   const { id } = req.params;
   const { name, email, phone, source } = req.body;
+  console.log("📥 updateContact llamado:", { id, name, email, phone, source });
 
   if (!name && !email && !phone && !source) {
+    console.warn("⚠️ No hay campos para actualizar");
     return res
       .status(400)
       .json({ error: "Al menos un campo debe ser actualizado" });
@@ -185,16 +193,17 @@ export const updateContact = (req, res) => {
   try {
     const contact = db.prepare("SELECT * FROM contacts WHERE id = ?").get(id);
     if (!contact) {
+      console.warn("⚠️ Contacto no encontrado:", id);
       return res.status(404).json({ error: "Contacto no encontrado" });
     }
 
-    const stmt = db.prepare(`
+    db.prepare(
+      `
       UPDATE contacts 
       SET name = ?, email = ?, phone = ?, source = ?
       WHERE id = ?
-    `);
-
-    stmt.run(
+    `
+    ).run(
       name || contact.name,
       email || contact.email,
       phone || contact.phone,
@@ -202,9 +211,10 @@ export const updateContact = (req, res) => {
       id
     );
 
+    console.log("✅ Contacto actualizado:", id);
     res.json({ message: "Contacto actualizado" });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error al actualizar el contacto:", err);
     res.status(500).json({ error: "Error al actualizar el contacto" });
   }
 };
@@ -212,18 +222,50 @@ export const updateContact = (req, res) => {
 // Eliminar contacto
 export const deleteContact = (req, res) => {
   const { id } = req.params;
+  console.log("📥 deleteContact llamado:", id);
 
   try {
-    const stmt = db.prepare("DELETE FROM contacts WHERE id = ?");
-    const info = stmt.run(id);
-
+    const info = db.prepare("DELETE FROM contacts WHERE id = ?").run(id);
     if (info.changes === 0) {
+      console.warn("⚠️ Contacto no encontrado para eliminar:", id);
       return res.status(404).json({ error: "Contacto no encontrado" });
     }
 
+    console.log("✅ Contacto eliminado:", id);
     res.json({ message: "Contacto eliminado" });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error al eliminar el contacto:", err);
     res.status(500).json({ error: "Error al eliminar el contacto" });
+  }
+};
+// Obtener contacto completo: contacto + hilos + notas
+export const getFullContact = (req, res) => {
+  const { id } = req.params;
+
+  try {
+    // 1️⃣ Contacto
+    const contact = db.prepare("SELECT * FROM contacts WHERE id = ?").get(id);
+    if (!contact)
+      return res.status(404).json({ error: "Contacto no encontrado" });
+
+    // 2️⃣ Hilos del contacto
+    const threads = db
+      .prepare("SELECT * FROM threads WHERE contact_id = ?")
+      .all(id);
+
+    // 3️⃣ Notas asociadas a esos hilos
+    const notes = db
+      .prepare(
+        `SELECT n.*, t.id as thread_id, t.status 
+         FROM notes n 
+         JOIN threads t ON n.thread_id = t.id
+         WHERE t.contact_id = ?`
+      )
+      .all(id);
+
+    res.json({ contact, threads, notes });
+  } catch (err) {
+    console.error("Error en getFullContact:", err);
+    res.status(500).json({ error: "Error al obtener contacto completo" });
   }
 };

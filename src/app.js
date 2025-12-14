@@ -1,24 +1,21 @@
 // src/app.js
 import express from "express";
 import cors from "cors";
-import db, { initDB } from "../db.js";
+import adminRoutes from "./routes/AdminRoutes.js";
+
 import logger from "./logger/index.js";
 import httpLogger from "./middleware/httpLogger.js";
-import contactRoutes from "./routes/ContactRoutes.js";
-import messagesRoutes from "./routes/MessagesRoutes.js";
-import notesRoutes from "./routes/NotesRoutes.js";
 
 const app = express();
+console.log("BACKEND CARGADO DESDE ESTA RUTA");
 
-// Middlewares base
+// Middlewares
 app.use(express.json());
 app.use(cors({ origin: true }));
 app.use(httpLogger);
 
-// Rutas
-app.use("/api/contacts", contactRoutes);
-app.use("/api/messages", messagesRoutes);
-app.use("/api/notes", notesRoutes);
+// Panel admin oculto
+app.use("/panel-secreto-7f4d2a1b/api/admin", adminRoutes);
 
 // Healthcheck
 app.get("/health", (_req, res) => {
@@ -32,16 +29,16 @@ app.use((req, res) => {
   res.status(404).json({ error: "Not found" });
 });
 
-// Manejador global de errores
+// Error global
 app.use((err, req, res, next) => {
   (req.log || logger).error({ err }, "unhandled_error");
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-// Soporte para inicializar DB (opcional)
+// Inicializar DB si se pasa --init
 if (process.argv.includes("--init")) {
   initDB();
-  logger.info("DB inicializada ✅");
+  logger.info("DB inicializada");
   process.exit(0);
 }
 

@@ -2,6 +2,7 @@ import db from "../../db.js";
 
 export const getMessages = (req, res) => {
   try {
+    console.log("Obteniendo todos los mensajes...");
     const rows = db
       .prepare(
         `
@@ -13,10 +14,11 @@ export const getMessages = (req, res) => {
       `
       )
       .all();
+    console.log("Mensajes obtenidos:", rows.length);
 
     res.json({ ok: true, data: rows });
   } catch (err) {
-    console.error(err);
+    console.error("Error en getMessages:", err);
     res.status(500).json({ error: "Error al obtener los mensajes" });
   }
 };

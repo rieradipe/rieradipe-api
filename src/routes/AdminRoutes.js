@@ -57,7 +57,9 @@ router.post("/login", (req, res) => {
   const token = jwt.sign({ role: adminUser.role }, SECRET, { expiresIn: "1h" });
   return res.json({ token });
 });
-
+router.get("/validate", authAdmin, (_req, res) => {
+  res.json({ valid: true });
+});
 // Montamos routers de contacts, notes y messages con authAdmin
 router.use("/contacts", authAdmin, contactRoutes);
 router.use("/notes", authAdmin, notesRoutes);

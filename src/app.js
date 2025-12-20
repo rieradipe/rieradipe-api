@@ -1,8 +1,15 @@
 // src/app.js
 import express from "express";
 import cors from "cors";
-import adminRoutes from "./routes/AdminRoutes.js";
 
+// Rutas
+import adminRoutes from "./routes/AdminRoutes.js";
+import contactRoutes from "./routes/ContactRoutes.js";
+import messagesRoutes from "./routes/MessagesRoutes.js";
+import notesRoutes from "./routes/NotesRoutes.js";
+import publicContactRoutes from "./routes/PublicContactRoutes.js";
+// Core
+import db from "../db.js";
 import logger from "./logger/index.js";
 import httpLogger from "./middleware/httpLogger.js";
 
@@ -14,28 +21,62 @@ app.use(express.json());
 app.use(cors({ origin: true }));
 app.use(httpLogger);
 
-// Panel admin oculto
+/* =========================
+   RUTAS PÚBLICAS
+========================= */
+
+// Contacto
+app.use("/api/contact", publicContactRoutes);
+
+// Mensajes
+app.use("/api/messages", messagesRoutes);
+
+// Notas (si el front las usa)
+app.use("/api/notes", notesRoutes);
+
+/* =========================
+   PANEL ADMIN OCULTO
+========================= */
+
 app.use("/panel-secreto-7f4d2a1b/api/admin", adminRoutes);
 
-// Healthcheck
+/* =========================
+   HEALTHCHECK
+========================= */
+
 app.get("/health", (_req, res) => {
-  const row = db.prepare('SELECT datetime("now") as now').get();
-  res.json({ ok: true, now: row.now });
+  try {
+    const row = db.prepare("SELECT datetime('now') as now").get();
+    console.log("Healthcheck DB:", row);
+    res.json({ ok: true, now: row.now });
+  } catch (err) {
+    console.error("Error Health DB:", err);
+    res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
-// 404 explícito
+/* =========================
+   404
+========================= */
+
 app.use((req, res) => {
   req.log?.warn?.({ url: req.originalUrl }, "route_not_found");
   res.status(404).json({ error: "Not found" });
 });
 
-// Error global
-app.use((err, req, res, next) => {
+/* =========================
+   ERROR GLOBAL
+========================= */
+
+app.use((err, req, res, _next) => {
   (req.log || logger).error({ err }, "unhandled_error");
   res.status(500).json({ error: "Internal Server Error" });
 });
 
-// Inicializar DB si se pasa --init
+/* =========================
+   INIT DB OPCIONAL
+========================= */
+
 if (process.argv.includes("--init")) {
   initDB();
   logger.info("DB inicializada");

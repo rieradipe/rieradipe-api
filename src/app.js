@@ -4,10 +4,10 @@ import cors from "cors";
 
 // Rutas
 import adminRoutes from "./routes/AdminRoutes.js";
-import contactRoutes from "./routes/ContactRoutes.js";
 import messagesRoutes from "./routes/MessagesRoutes.js";
 import notesRoutes from "./routes/NotesRoutes.js";
 import publicContactRoutes from "./routes/PublicContactRoutes.js";
+
 // Core
 import db from "../db.js";
 import logger from "./logger/index.js";
@@ -25,7 +25,7 @@ app.use(httpLogger);
    RUTAS PÚBLICAS
 ========================= */
 
-// Contacto
+// Contacto público (formulario)
 app.use("/api/contact", publicContactRoutes);
 
 // Mensajes

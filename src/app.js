@@ -1,6 +1,7 @@
 // src/app.js
 import express from "express";
 import cors from "cors";
+import { initDB } from "../db.js";
 
 // Rutas
 import adminRoutes from "./routes/AdminRoutes.js";
@@ -77,10 +78,7 @@ app.use((err, req, res, _next) => {
    INIT DB OPCIONAL
 ========================= */
 
-if (process.argv.includes("--init")) {
-  initDB();
-  logger.info("DB inicializada");
-  process.exit(0);
-}
+initDB();
+console.log("✅ Base de datos inicializada automáticamente");
 
 export default app;

@@ -50,7 +50,14 @@ export const createContactWithThreadAndNote = async (req, res) => {
       "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
     ).run(threadId, message, "inbound", "web");
 
-    // 4️⃣ Enviar correo al admin
+    //probamos eliminar errores hasta dar con un servicio mail coherente con nosotros4️⃣
+    try {
+      await sendContactMail({ nombre, email, asunto: subject, mensaje });
+    } catch (err) {
+      console.warn("Correo admin falló, ignorando para frontend:", err.message);
+    }
+
+    /*Enviar correo al admin
     try {
       const infoAdmin = await sendContactMail({
         nombre: name,
@@ -132,6 +139,7 @@ export const createContactWithThreadAndNote = async (req, res) => {
         err.message
       );
     }
+      */
 
     console.log("✅ Contacto, hilo y notas creados correctamente:", {
       contactId,

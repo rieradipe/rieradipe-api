@@ -47,40 +47,28 @@ export const createContactWithThreadAndNote = async (req, res) => {
     ).run(threadId, message, "inbound", "web");
 
     console.log("📝 Nota creada");
+// 4️⃣ Enviar correo al admin (NO bloqueante)
+sendContactMail({
+  nombre: name,
+  email,
+  asunto: subject,
+  mensaje: message,
+}).catch(err => console.warn("⚠️ Correo admin falló:", err.message));
 
-    // 4️⃣ Enviar correo al admin (NO bloqueante)
-    try {
-      await sendContactMail({
-        nombre: name,
-        email,
-        asunto: subject,
-        mensaje: message,
-      });
-    } catch (err) {
-      console.warn("⚠️ Correo admin falló:", err.message);
-    }
+// 5️⃣ Enviar auto-reply al usuario (NO bloqueante)
+sendAutoReply({ nombre: name, email }).catch(err =>
+  console.warn("⚠️ Auto-reply falló:", err.message)
+);
 
-    // 5️⃣ Enviar auto-reply al usuario (NO bloqueante)
-    try {
-      await sendAutoReply({ nombre: name, email });
-    } catch (err) {
-      console.warn("⚠️ Auto-reply falló:", err.message);
-    }
+// 6️⃣ Responder al frontend inmediatamente
+return res.status(201).json({
+  success: true,
+  message: "Contacto recibido correctamente",
+  contactId,
+  threadId,
+});
 
-    return res.status(201).json({
-      success: true,
-      message: "Contacto recibido correctamente",
-      contactId,
-      threadId,
-    });
-  } catch (err) {
-    console.error("❌ Error creando contacto:", err);
-    return res
-      .status(500)
-      .json({ error: "Error interno al guardar el contacto" });
-  }
-};
-
+   
 // Listar todos los contactos
 export const getAllContacts = (req, res) => {
   try {

@@ -39,7 +39,7 @@ app.use("/api/notes", notesRoutes);
    PANEL ADMIN OCULTO
 ========================= */
 
-app.use("/panel-secreto-7f4d2a1b/api/admin", adminRoutes);
+app.use("/panel-secreto-7f4d2a1b/api/admin", express.static("path-to-build"));
 
 /* =========================
    HEALTHCHECK

@@ -1,5 +1,7 @@
+// src/routes/ContactRoutes.js
 import express from "express";
 import {
+  createContactWithThreadAndNote,
   getAllContacts,
   getContactById,
   getFullContact,
@@ -9,19 +11,22 @@ import {
 
 const router = express.Router();
 
-// LISTADO
+// CREAR contacto + hilo + nota
+router.post("/", createContactWithThreadAndNote);
+
+// LISTAR todos los contactos
 router.get("/", getAllContacts);
 
-// DETALLE SIMPLE
+// DETALLE simple por ID
 router.get("/:id", getContactById);
 
-// DETALLE COMPLETO (CLAVE PARA EL PANEL)
+// DETALLE completo (contacto + hilos + notas)
 router.get("/:id/full", getFullContact);
 
-// ACTUALIZAR
+// ACTUALIZAR contacto
 router.put("/:id", updateContact);
 
-// ELIMINAR
+// ELIMINAR contacto
 router.delete("/:id", deleteContact);
 
 export default router;

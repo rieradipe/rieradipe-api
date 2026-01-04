@@ -12,63 +12,60 @@ export const createContactWithThreadAndNote = async (req, res) => {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
   }
 
-  try {
-    // 1️⃣ Buscar o crear contacto
-    let contact = db
-      .prepare("SELECT id FROM contacts WHERE email = ? LIMIT 1")
-      .get(email);
+  // 1️⃣ Buscar o crear contacto
+  let contact = db
+    .prepare("SELECT id FROM contacts WHERE email = ? LIMIT 1")
+    .get(email);
 
-    let contactId;
-    if (!contact) {
-      const info = db
-        .prepare(
-          "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
-        )
-        .run(name ?? null, email, phone ?? null, source ?? "web");
-
-      contactId = info.lastInsertRowid;
-      console.log("➕ Contacto creado:", contactId);
-    } else {
-      contactId = contact.id;
-      console.log("✅ Contacto existente:", contactId);
-    }
-
-    // 2️⃣ Crear hilo
-    const threadInfo = db
+  let contactId;
+  if (!contact) {
+    const info = db
       .prepare(
-        "INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)"
+        "INSERT INTO contacts (name, email, phone, source) VALUES (?, ?, ?, ?)"
       )
-      .run(contactId, subject, "open");
-    const threadId = threadInfo.lastInsertRowid;
+      .run(name ?? null, email, phone ?? null, source ?? "web");
 
-    // 3️⃣ Crear nota inicial
-    db.prepare(
-      "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
-    ).run(threadId, message, "inbound", "web");
+    contactId = info.lastInsertRowid;
+    console.log("➕ Contacto creado:", contactId);
+  } else {
+    contactId = contact.id;
+    console.log("✅ Contacto existente:", contactId);
+  }
 
-    console.log("📝 Nota creada");
-// 4️⃣ Enviar correo al admin (NO bloqueante)
-sendContactMail({
-  nombre: name,
-  email,
-  asunto: subject,
-  mensaje: message,
-}).catch(err => console.warn("⚠️ Correo admin falló:", err.message));
+  // 2️⃣ Crear hilo
+  const threadInfo = db
+    .prepare("INSERT INTO threads (contact_id, title, status) VALUES (?, ?, ?)")
+    .run(contactId, subject, "open");
+  const threadId = threadInfo.lastInsertRowid;
 
-// 5️⃣ Enviar auto-reply al usuario (NO bloqueante)
-sendAutoReply({ nombre: name, email }).catch(err =>
-  console.warn("⚠️ Auto-reply falló:", err.message)
-);
+  // 3️⃣ Crear nota inicial
+  db.prepare(
+    "INSERT INTO notes (thread_id, body, direction, medium) VALUES (?, ?, ?, ?)"
+  ).run(threadId, message, "inbound", "web");
 
-// 6️⃣ Responder al frontend inmediatamente
-return res.status(201).json({
-  success: true,
-  message: "Contacto recibido correctamente",
-  contactId,
-  threadId,
-});
+  console.log("📝 Nota creada");
+  // 4️⃣ Enviar correo al admin (NO bloqueante)
+  sendContactMail({
+    nombre: name,
+    email,
+    asunto: subject,
+    mensaje: message,
+  }).catch((err) => console.warn("⚠️ Correo admin falló:", err.message));
 
-   
+  // 5️⃣ Enviar auto-reply al usuario (NO bloqueante)
+  sendAutoReply({ nombre: name, email }).catch((err) =>
+    console.warn("⚠️ Auto-reply falló:", err.message)
+  );
+
+  // 6️⃣ Responder al frontend inmediatamente
+  return res.status(201).json({
+    success: true,
+    message: "Contacto recibido correctamente",
+    contactId,
+    threadId,
+  });
+};
+
 // Listar todos los contactos
 export const getAllContacts = (req, res) => {
   try {

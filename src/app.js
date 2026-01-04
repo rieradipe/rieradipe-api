@@ -1,6 +1,8 @@
 // src/app.js
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import { initDB } from "../db.js";
 
 // Rutas
@@ -14,6 +16,9 @@ import db from "../db.js";
 import logger from "./logger/index.js";
 import httpLogger from "./middleware/httpLogger.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 console.log("BACKEND CARGADO DESDE ESTA RUTA");
 
@@ -25,26 +30,31 @@ app.use(httpLogger);
 /* =========================
    RUTAS PÚBLICAS
 ========================= */
-
-// Contacto público (formulario)
 app.use("/api/contact", publicContactRoutes);
-
-// Mensajes
 app.use("/api/messages", messagesRoutes);
-
-// Notas (si el front las usa)
 app.use("/api/notes", notesRoutes);
 
 /* =========================
-   PANEL ADMIN OCULTO
+   PANEL ADMIN OCULTO (API)
 ========================= */
-
 app.use("/panel-secreto-7f4d2a1b/api/admin", adminRoutes);
+
+/* =========================
+   PANEL ADMIN (FRONTEND)
+========================= */
+app.use(
+  "/panel-secreto-7f4d2a1b",
+  express.static(path.join(__dirname, "../admin-panel/build"))
+);
+
+// Para que React Router funcione correctamente
+app.get("/panel-secreto-7f4d2a1b/*", (_req, res) => {
+  res.sendFile(path.join(__dirname, "../admin-panel/build/index.html"));
+});
 
 /* =========================
    HEALTHCHECK
 ========================= */
-
 app.get("/health", (_req, res) => {
   try {
     const row = db.prepare("SELECT datetime('now') as now").get();
@@ -59,7 +69,6 @@ app.get("/health", (_req, res) => {
 /* =========================
    404
 ========================= */
-
 app.use((req, res) => {
   req.log?.warn?.({ url: req.originalUrl }, "route_not_found");
   res.status(404).json({ error: "Not found" });
@@ -68,16 +77,14 @@ app.use((req, res) => {
 /* =========================
    ERROR GLOBAL
 ========================= */
-
 app.use((err, req, res, _next) => {
   (req.log || logger).error({ err }, "unhandled_error");
   res.status(500).json({ error: "Internal Server Error" });
 });
 
 /* =========================
-   INIT DB OPCIONAL
+   INIT DB
 ========================= */
-
 initDB();
 console.log("✅ Base de datos inicializada automáticamente");
 

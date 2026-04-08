@@ -1,17 +1,9 @@
 // src/service/emailService.js
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-// Transportador configurado con tus variables de entorno
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Tu firma HTML
+// Tu firma HTML (la mantenemos 💖)
 const firmaHTML = `
 <div dir="ltr">
   <table cellpadding="0" cellspacing="0" style="font-family:sans-serif;color:rgb(33,33,33);padding:10px">
@@ -39,7 +31,7 @@ const firmaHTML = `
             <tbody>
               <tr>
                 <td style="padding-right:20px">
-                  📧 <a href="mailto:rieradipe@gmail.com" style="color:rgb(66,54,54)" target="_blank">rieradipe@gmail.com</a>
+                  📧 <a href="mailto:contacto@rieradipe.dev" style="color:rgb(66,54,54)" target="_blank">contacto@rieradipe.dev</a>
                 </td>
                 <td style="padding-left:20px">
                   📞 <span style="color:rgb(66,54,54)">632193202</span>
@@ -47,7 +39,7 @@ const firmaHTML = `
               </tr>
               <tr>
                 <td colspan="2" style="padding-top:5px">
-                  🌐 <span style="color:rgb(66,54,54)">Próximamente</span>
+                  🌐 <span style="color:rgb(66,54,54)">https://rieradipe.dev</span>
                 </td>
               </tr>
             </tbody>
@@ -59,52 +51,41 @@ const firmaHTML = `
 </div>
 `;
 
-// Enviar correo al admin
-export const sendContactMail = async ({
-  nombre,
-  email,
-  asunto,
-  mensaje,
-  contactId,
-  threadId,
-}) => {
+// 📩 EMAIL AL ADMIN
+export const sendContactMail = async ({ nombre, email, asunto, mensaje }) => {
   const htmlContent = `
-  ${firmaHTML}
-  <hr>
-    <p>Nuevo mensaje de contacto recibido:</p>
+    ${firmaHTML}
+    <hr>
+    <p><strong>Nuevo mensaje desde la web</strong></p>
     <p><strong>Nombre:</strong> ${nombre}</p>
     <p><strong>Email:</strong> ${email}</p>
     <p><strong>Asunto:</strong> ${asunto}</p>
     <p><strong>Mensaje:</strong><br>${mensaje}</p>
   `;
 
-  const info = await transporter.sendMail({
-    from: `"RieraDipe" <${process.env.SMTP_USER}>`,
-    to: process.env.MAIL_TO,
+  return await resend.emails.send({
+    from: `RieraDipe <${process.env.CONTACT_FROM_EMAIL}>`,
+    to: [process.env.CONTACT_TO_EMAIL],
+    replyTo: email, // 🔥 clave para responder al usuario
     subject: `[Contacto] ${asunto}`,
     html: htmlContent,
   });
-
-  return info;
 };
 
-// Auto-reply al usuario
+// 🤖 AUTO-REPLY AL USUARIO
 export const sendAutoReply = async ({ nombre, email }) => {
   const htmlContent = `
-  ${firmaHTML}
-  </hr>
+    ${firmaHTML}
+    <hr>
     <p>Hola ${nombre},</p>
-    <p>Gracias por contactarnos. Hemos recibido tu mensaje y nos pondremos en contacto contigo lo antes posible.</p>
-    <p>Mientras tanto, puedes visitar nuestra web para más información.</p>
-    
+    <p>Gracias por contactarnos. Hemos recibido tu mensaje y te responderemos lo antes posible.</p>
+    <p>Un saludo,<br/>Equipo RieraDipe</p>
   `;
 
-  const info = await transporter.sendMail({
-    from: `"RieraDipe" <${process.env.SMTP_USER}>`,
-    to: email,
+  return await resend.emails.send({
+    from: `RieraDipe <${process.env.CONTACT_FROM_EMAIL}>`,
+    to: [email],
     subject: "Hemos recibido tu mensaje",
     html: htmlContent,
   });
-
-  return info;
 };

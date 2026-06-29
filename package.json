@@ -31,15 +31,16 @@
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.3",
-    "mongose": "^0.0.2-security",
+    "mongoose": "^7.3.0",
     "nodemailer": "^7.0.9",
     "pino": "^10.1.0",
     "pino-http": "^11.0.0",
+    "pino-pretty": "^13.1.2",
+    "resend": "^6.10.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "cross-env": "^10.1.0",
-    "nodemon": "^3.1.11",
-    "pino-pretty": "^13.1.2"
+    "nodemon": "^3.1.11"
   }
 }

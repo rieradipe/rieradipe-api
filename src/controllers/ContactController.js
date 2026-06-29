@@ -44,18 +44,31 @@ export const createContactWithThreadAndNote = async (req, res) => {
   ).run(threadId, message, "inbound", "web");
 
   console.log("📝 Nota creada");
-  // 4️⃣ Enviar correo al admin (NO bloqueante)
-  sendContactMail({
-    nombre: name,
-    email,
-    asunto: subject,
-    mensaje: message,
-  }).catch((err) => console.warn("⚠️ Correo admin falló:", err.message));
+    try {
+    const adminResult = await sendContactMail({
+      nombre: name,
+      email,
+      asunto: subject,
+      mensaje: message,
+    });
 
-  // 5️⃣ Enviar auto-reply al usuario (NO bloqueante)
-  sendAutoReply({ nombre: name, email }).catch((err) =>
-    console.warn("⚠️ Auto-reply falló:", err.message)
-  );
+    console.log("✅ Correo admin enviado:", adminResult);
+
+    const autoReplyResult = await sendAutoReply({
+      nombre: name,
+      email,
+    });
+
+    console.log("✅ Auto-reply enviado:", autoReplyResult);
+  } catch (err) {
+    console.error("❌ Error enviando correo:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: "Error enviando los correos",
+      detail: err.message,
+    });
+  }
 
   // 6️⃣ Responder al frontend inmediatamente
   return res.status(201).json({

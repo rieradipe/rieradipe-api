@@ -1,4 +1,6 @@
-// src/service/emailService.js
+import dotenv from "dotenv";
+dotenv.config();
+
 import { Resend } from "resend";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -63,6 +65,7 @@ const firmaHTML = `
 `;
 
 // 📩 EMAIL AL ADMIN
+// 📩 EMAIL AL ADMIN
 export const sendContactMail = async ({ nombre, email, asunto, mensaje }) => {
   const htmlContent = `
     ${firmaHTML}
@@ -74,13 +77,19 @@ export const sendContactMail = async ({ nombre, email, asunto, mensaje }) => {
     <p><strong>Mensaje:</strong><br>${mensaje}</p>
   `;
 
-  return await resend.emails.send({
+  const result = await resend.emails.send({
     from: `RieraDipe <${process.env.CONTACT_FROM_EMAIL}>`,
     to: [process.env.CONTACT_TO_EMAIL],
-    reply_to: email, // 🔥 IMPORTANTE (nombre correcto en Resend)
+    reply_to: email,
     subject: `[Contacto] ${asunto}`,
     html: htmlContent,
   });
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return result;
 };
 
 // 🤖 AUTO-REPLY AL USUARIO
@@ -93,10 +102,16 @@ export const sendAutoReply = async ({ nombre, email }) => {
     <p>Un saludo,<br/>Equipo RieraDipe</p>
   `;
 
-  return await resend.emails.send({
+  const result = await resend.emails.send({
     from: `RieraDipe <${process.env.CONTACT_FROM_EMAIL}>`,
     to: [email],
     subject: "Hemos recibido tu mensaje",
     html: htmlContent,
   });
+
+  if (result.error) {
+    throw new Error(result.error.message);
+  }
+
+  return result;
 };
